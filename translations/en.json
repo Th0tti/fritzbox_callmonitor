@@ -1,0 +1,16 @@
+{
+    "title": "Fritz!Box Callmonitor",
+    "config": {
+        "step": {
+            "user": {
+                "title": "Configure Fritz!Box Callmonitor",
+                "description": "Enter the connection details for your Fritz!Box.",
+                "data": {
+                    "host": "Host",
+                    "username": "Username",
+                    "password": "Password"
+                }
+            }
+        }
+    }
+}
