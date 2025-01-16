@@ -1,0 +1,16 @@
+{
+    "title": "Fritz!Box Anrufmonitor",
+    "config": {
+        "step": {
+            "user": {
+                "title": "Fritz!Box Anrufmonitor einrichten",
+                "description": "Gib die Verbindungsdetails deiner Fritz!Box ein.",
+                "data": {
+                    "host": "Host",
+                    "username": "Benutzername",
+                    "password": "Passwort"
+                }
+            }
+        }
+    }
+}
