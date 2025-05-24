@@ -51,7 +51,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     )
     await coordinator.async_config_entry_first_refresh()
     hass.data[DOMAIN][entry.entry_id] = coordinator
-    hass.config_entries.async_setup_platforms(entry, PLATFORMS)
+
+    # Alte Zeile ersetzen:
+    # hass.config_entries.async_setup_platforms(entry, PLATFORMS)
+    # durch:
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
     return True
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
