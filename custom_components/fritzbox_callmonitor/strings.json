@@ -1,0 +1,23 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Fritz!Box Call Monitor konfigurieren",
+        "data": {
+          "host": "Fritz!Box Host",
+          "username": "Benutzername",
+          "password": "Passwort",
+          "port": "TR-064 Port",
+          "fetch_call_history": "Anrufliste abrufen",
+          "fetch_voicemails": "Sprachnachrichten abrufen"
+        }
+      }
+    }
+  },
+  "sensor": {
+    "outgoing_calls": { "name": "Abgehende Anrufe" },
+    "incoming_calls": { "name": "Eingehende Anrufe" },
+    "missed_calls":   { "name": "Verpasste Anrufe" },
+    "voicemails":     { "name": "Sprachnachrichten" }
+  }
+}
