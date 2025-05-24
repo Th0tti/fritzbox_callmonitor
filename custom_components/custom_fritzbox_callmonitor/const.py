@@ -1,5 +1,5 @@
 """Konstanten für die Integration."""
-DOMAIN = "fritzbox_callmonitor"
+DOMAIN = "custom_fritzbox_callmonitor"
 
 CONF_HOST = "host"
 CONF_USERNAME = "username"
