@@ -26,7 +26,6 @@ from .const import (
     DOMAIN,
     MANUFACTURER,
     SERIAL_NUMBER,
-    SERIAL_NUMBER as SERIAL_NUMBER_CONST,
     FritzState,
 )
 
@@ -89,7 +88,7 @@ class FritzBoxCallSensor(SensorEntity):
         self._prefixes = prefixes
         self._host = host
         self._port = port
-        self._monitor: FritzMonitor | None = None
+        self._monitor: FritzBoxCallMonitor | None = None
         self._attributes: dict[str, str | list[str] | bool] = {}
 
         self._attr_translation_placeholders = {"phonebook_name": phonebook_name}
@@ -218,7 +217,6 @@ class FritzBoxCallMonitor:
         df_in = "%d.%m.%y %H:%M:%S"
         df_out = "%Y-%m-%dT%H:%M:%S"
         isotime = datetime.strptime(line[0], df_in).strftime(df_out)
-        att: dict[str, str | bool]
 
         if line[1] == FritzState.RING:
             self._sensor.set_state(CallState.RINGING)
