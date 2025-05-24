@@ -13,7 +13,7 @@ from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
-# Service-Versionen für FRITZ!OS 8.x (zuerst v2, fallback v1)
+# Die korrekten Service-Namen MÜSSEN mit Doppelpunkt stehen!
 SERVICES = ["X_AVM-DE_OnTel:2", "X_AVM-DE_OnTel:1"]
 
 class FritzboxCallUpdateCoordinator(DataUpdateCoordinator[dict]):
@@ -38,15 +38,15 @@ class FritzboxCallUpdateCoordinator(DataUpdateCoordinator[dict]):
         self._calls: list[dict] = []
         self._voicemails: list[dict] = []
 
-        # 1) Starte CallMonitor und hole Queue
+        # CallMonitor starten und Queue holen
         self._monitor = FritzMonitor(address=self.host, port=self.port)
         self._event_queue = self._monitor.start()
 
-        # 2) Thread, der live Events aus der Queue liest
+        # Thread zum Verarbeiten der Queue
         threading.Thread(target=self._event_loop, daemon=True).start()
 
     def _event_loop(self) -> None:
-        """Live-Events verarbeiten und in die Liste packen."""
+        """Live-Events aus der Queue lesen."""
         while True:
             try:
                 raw = self._event_queue.get(timeout=10)
@@ -68,12 +68,13 @@ class FritzboxCallUpdateCoordinator(DataUpdateCoordinator[dict]):
                 })
 
     async def _async_update_data(self) -> dict:
-        """Wird stündlich aufgerufen, um TR-064-Daten (History & Voicemail) zu laden."""
+        """Wird stündlich ausgeführt, um TR-064-Daten zu laden."""
         try:
             if self.fetch_call_history:
                 await self.hass.async_add_executor_job(self._fetch_call_history)
-            if self.fetch_voicemails:
-                await self.hass.async_add_executor_job(self._fetch_voicemails)
+            # bis Voicemail-Probleme geklärt sind, nicht abrufen
+            # if self.fetch_voicemails:
+            #     await self.hass.async_add_executor_job(self._fetch_voicemails)
         except Exception as err:
             raise UpdateFailed(f"Fehler beim Abrufen via TR-064: {err}") from err
 
@@ -87,7 +88,7 @@ class FritzboxCallUpdateCoordinator(DataUpdateCoordinator[dict]):
         }
 
     def _fetch_call_history(self) -> None:
-        """Komplette History via TR-064 abrufen und Liste ersetzen."""
+        """Komplette History via TR-064 abrufen und interne Liste ersetzen."""
         fc = FritzConnection(
             address=self.host,
             port=self.port,
@@ -95,7 +96,6 @@ class FritzboxCallUpdateCoordinator(DataUpdateCoordinator[dict]):
             password=self.password,
         )
 
-        # versuche v2, fallback v1
         for service in SERVICES:
             try:
                 result = fc.call_action(service, "GetCallList")
@@ -109,42 +109,42 @@ class FritzboxCallUpdateCoordinator(DataUpdateCoordinator[dict]):
 
         calls: list[dict] = []
         for item in result.get("NewCallList", {}).get("Call", []):
-            call = _parse_call(item)
-            calls.append(call)
+            calls.append(_parse_call(item))
 
-        # ersetze interne Liste
+        # interne Liste ersetzen
         self._calls = calls
 
-    def _fetch_voicemails(self) -> None:
-        """Alle Voicemails via TR-064 abrufen und Liste ersetzen."""
-        fc = FritzConnection(
-            address=self.host,
-            port=self.port,
-            user=self.username,
-            password=self.password,
-        )
-
-        for service in SERVICES:
-            try:
-                result = fc.call_action(service, "GetMessageList")
-                _LOGGER.debug("GetMessageList erfolgreich mit %s", service)
-                break
-            except Exception as err:
-                _LOGGER.warning("GetMessageList mit %s fehlgeschlagen: %s", service, err)
-        else:
-            _LOGGER.error("GetMessageList ist mit allen SERVICES fehlgeschlagen")
-            return
-
-        vms: list[dict] = []
-        for item in result.get("NewMessageList", {}).get("Message", []):
-            vm = _parse_voicemail(item)
-            vms.append(vm)
-
-        self._voicemails = vms
+    # Voicemail-Funktion bis auf Weiteres auskommentiert,
+    # bis Dein Box-OS & Credentials laufen:
+    #
+    # def _fetch_voicemails(self) -> None:
+    #     """Alle Voicemails via TR-064 abrufen und ersetzen."""
+    #     fc = FritzConnection(
+    #         address=self.host,
+    #         port=self.port,
+    #         user=self.username,
+    #         password=self.password,
+    #     )
+    #
+    #     for service in SERVICES:
+    #         try:
+    #             result = fc.call_action(service, "GetMessageList")
+    #             _LOGGER.debug("GetMessageList erfolgreich mit %s", service)
+    #             break
+    #         except Exception as err:
+    #             _LOGGER.warning("GetMessageList mit %s fehlgeschlagen: %s", service, err)
+    #     else:
+    #         _LOGGER.error("GetMessageList ist mit allen SERVICES fehlgeschlagen")
+    #         return
+    #
+    #     vms: list[dict] = []
+    #     for item in result.get("NewMessageList", {}).get("Message", []):
+    #         vms.append(_parse_voicemail(item))
+    #     self._voicemails = vms
 
 
 def _parse_call(item: dict) -> dict:
-    """TR-064 CallList-Eintrag parsen."""
+    """Einzelnen CallList-Eintrag parsen."""
     from datetime import datetime
     time_str = item.get("Time", "")
     dt = datetime.strptime(time_str, "%Y-%m-%dT%H:%M:%S")
@@ -160,21 +160,8 @@ def _parse_call(item: dict) -> dict:
     }
 
 
-def _parse_voicemail(item: dict) -> dict:
-    """TR-064 MessageList-Eintrag parsen."""
-    from datetime import datetime
-    ts = item.get("Timestamp", "")
-    dt = datetime.strptime(ts, "%Y-%m-%dT%H:%M:%S")
-    return {
-        "timestamp": dt,
-        "date": dt.strftime("%Y-%m-%d"),
-        "time": dt.strftime("%H:%M:%S"),
-        "url": item.get("MessageURL", ""),
-    }
-
-
 def _parse_monitor_event(raw: str) -> dict | None:
-    """Einzelnes Live-Event aus CallMonitor-Queue parsen."""
+    """Live-Event aus Monitor-Queue parsen."""
     from datetime import datetime
     parts = raw.split(";")
     if len(parts) < 2:
@@ -196,7 +183,7 @@ def _parse_monitor_event(raw: str) -> dict | None:
     elif verb == "CALL":
         number = parts[3] if len(parts) > 3 else ""
         call_type = "outgoing"
-    else:  # DISCONNECT
+    else:
         number = ""
         call_type = "missed"
 
