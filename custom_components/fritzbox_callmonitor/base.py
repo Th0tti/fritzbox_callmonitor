@@ -34,12 +34,10 @@ class FritzboxCallUpdateCoordinator(DataUpdateCoordinator[dict]):
         self._calls: list[dict] = []
         self._voicemails: list[dict] = []
 
-        # FritzMonitor für live-Events (nur Adresse/Port, keine user/passwd)
+        # FritzMonitor für live-Events (nur Adresse und Port)
         self._monitor = FritzMonitor(
             address=self.host,
             port=self.port,
-            protocol="http",
-            use_tls=False,
         )
         self._monitor.register_callback(self._on_call_event)
         self._monitor.start()
@@ -60,8 +58,12 @@ class FritzboxCallUpdateCoordinator(DataUpdateCoordinator[dict]):
         return {"calls": list(self._calls), "voicemails": list(self._voicemails)}
 
     def _fetch_call_history(self) -> None:
-        fc = FritzConnection(address=self.host, port=self.port,
-                             user=self.username, password=self.password)
+        fc = FritzConnection(
+            address=self.host,
+            port=self.port,
+            user=self.username,
+            password=self.password,
+        )
         result = fc.call_action("X_AVM-DE_OnTel:1", "GetCallList")
         call_list = result.get("NewCallList", {}).get("Call", [])
         for item in call_list:
@@ -70,8 +72,12 @@ class FritzboxCallUpdateCoordinator(DataUpdateCoordinator[dict]):
                 self._calls.append(call)
 
     def _fetch_voicemails(self) -> None:
-        fc = FritzConnection(address=self.host, port=self.port,
-                             user=self.username, password=self.password)
+        fc = FritzConnection(
+            address=self.host,
+            port=self.port,
+            user=self.username,
+            password=self.password,
+        )
         result = fc.call_action("X_AVM-DE_OnTel:1", "GetMessageList")
         msgs = result.get("NewMessageList", {}).get("Message", [])
         for item in msgs:
