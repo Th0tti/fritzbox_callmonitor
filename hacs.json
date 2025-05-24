@@ -1,0 +1,5 @@
+{
+  "name": "Fritz!Box Call Monitor",
+  "content_in_root": false,
+  "domains": ["fritzbox_callmonitor"]
+}
