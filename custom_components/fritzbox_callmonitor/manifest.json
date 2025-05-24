@@ -1,7 +1,7 @@
 {
   "domain": "fritzbox_callmonitor",
   "name": "Fritz!Box Call Monitor",
-  "version": "2.0.1",
+  "version": "2.0.0",
   "documentation": "https://github.com/DEIN_USER/fritzbox_callmonitor",
   "requirements": ["fritzconnection>=1.6.0"],
   "dependencies": [],
