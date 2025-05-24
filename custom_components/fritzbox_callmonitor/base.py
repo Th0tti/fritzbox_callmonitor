@@ -13,8 +13,8 @@ from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
-# Fritz!OS 8.x benötigt OnTel Version 2
-SERVICE = "X_AVM-DE_OnTel:2"
+# Versuche beide Service-Versionen, damit wir historische Anrufe bekommen
+SERVICES = ["X_AVM-DE_OnTel:2", "X_AVM-DE_OnTel:1"]
 
 class FritzboxCallUpdateCoordinator(DataUpdateCoordinator[dict]):
     def __init__(
@@ -77,6 +77,7 @@ class FritzboxCallUpdateCoordinator(DataUpdateCoordinator[dict]):
         except Exception as err:
             raise UpdateFailed(f"Fehler beim Abrufen via TR-064: {err}") from err
 
+        # nur die letzten 60 Tage behalten
         cutoff = datetime.now() - timedelta(days=60)
         self._calls = [c for c in self._calls if c["datetime"] >= cutoff]
 
@@ -86,17 +87,23 @@ class FritzboxCallUpdateCoordinator(DataUpdateCoordinator[dict]):
         }
 
     def _fetch_call_history(self) -> None:
-        """Abruf aller Anrufe via TR-064."""
-        try:
-            fc = FritzConnection(
-                address=self.host,
-                port=self.port,
-                user=self.username,
-                password=self.password,
-            )
-            result = fc.call_action(SERVICE, "GetCallList")
-        except Exception as err:
-            _LOGGER.warning("GetCallList (%s) fehlgeschlagen: %s", SERVICE, err)
+        """Erstmaliger und stündlicher Abruf aller Anrufe via TR-064."""
+        fc = FritzConnection(
+            address=self.host,
+            port=self.port,
+            user=self.username,
+            password=self.password,
+        )
+
+        for service in SERVICES:
+            try:
+                result = fc.call_action(service, "GetCallList")
+                _LOGGER.debug("GetCallList erfolgreich mit %s", service)
+                break
+            except Exception as err:
+                _LOGGER.warning("GetCallList mit %s fehlgeschlagen: %s", service, err)
+        else:
+            _LOGGER.error("GetCallList ist mit allen SERVICES fehlgeschlagen")
             return
 
         for item in result.get("NewCallList", {}).get("Call", []):
@@ -105,17 +112,23 @@ class FritzboxCallUpdateCoordinator(DataUpdateCoordinator[dict]):
                 self._calls.append(call)
 
     def _fetch_voicemails(self) -> None:
-        """Abruf aller Sprachnachrichten via TR-064."""
-        try:
-            fc = FritzConnection(
-                address=self.host,
-                port=self.port,
-                user=self.username,
-                password=self.password,
-            )
-            result = fc.call_action(SERVICE, "GetMessageList")
-        except Exception as err:
-            _LOGGER.warning("GetMessageList (%s) fehlgeschlagen: %s", SERVICE, err)
+        """Erstmaliger und stündlicher Abruf aller Sprachnachrichten via TR-064."""
+        fc = FritzConnection(
+            address=self.host,
+            port=self.port,
+            user=self.username,
+            password=self.password,
+        )
+
+        for service in SERVICES:
+            try:
+                result = fc.call_action(service, "GetMessageList")
+                _LOGGER.debug("GetMessageList erfolgreich mit %s", service)
+                break
+            except Exception as err:
+                _LOGGER.warning("GetMessageList mit %s fehlgeschlagen: %s", service, err)
+        else:
+            _LOGGER.error("GetMessageList ist mit allen SERVICES fehlgeschlagen")
             return
 
         for item in result.get("NewMessageList", {}).get("Message", []):
@@ -125,6 +138,7 @@ class FritzboxCallUpdateCoordinator(DataUpdateCoordinator[dict]):
 
 
 def _parse_call(item: dict) -> dict:
+    """Parse TR-064 CallList-Eintrag."""
     from datetime import datetime
     time_str = item.get("Time", "")
     dt = datetime.strptime(time_str, "%Y-%m-%dT%H:%M:%S")
@@ -141,6 +155,7 @@ def _parse_call(item: dict) -> dict:
 
 
 def _parse_voicemail(item: dict) -> dict:
+    """Parse TR-064 MessageList-Eintrag."""
     from datetime import datetime
     ts = item.get("Timestamp", "")
     dt = datetime.strptime(ts, "%Y-%m-%dT%H:%M:%S")
@@ -153,11 +168,13 @@ def _parse_voicemail(item: dict) -> dict:
 
 
 def _parse_monitor_event(raw: str) -> dict | None:
+    """Parse einen String aus CallMonitor-Queue in unser dict-Format."""
     from datetime import datetime
     parts = raw.split(";")
     if len(parts) < 2:
         return None
 
+    # Datum/Zeit im Format 'DD.MM.YY HH:MM:SS'
     try:
         dt = datetime.strptime(parts[0], "%d.%m.%y %H:%M:%S")
     except ValueError:
@@ -172,7 +189,7 @@ def _parse_monitor_event(raw: str) -> dict | None:
         number = parts[3] if len(parts) > 3 else ""
         call_type = "incoming"
     elif verb == "CALL":
-        number = parts[4] if len(parts) > 4 else ""
+        number = parts[3] if len(parts) > 3 else ""
         call_type = "outgoing"
     else:  # DISCONNECT
         number = ""
