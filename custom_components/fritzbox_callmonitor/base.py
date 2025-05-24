@@ -33,11 +33,11 @@ class FritzboxCallUpdateCoordinator(DataUpdateCoordinator[dict]):
         self.fetch_voicemails = fetch_voicemails
         self._calls: list[dict] = []
         self._voicemails: list[dict] = []
+
+        # FritzMonitor für live-Events (nur Adresse/Port, keine user/passwd)
         self._monitor = FritzMonitor(
             address=self.host,
             port=self.port,
-            user=self.username,
-            passwd=self.password,
             protocol="http",
             use_tls=False,
         )
@@ -45,6 +45,7 @@ class FritzboxCallUpdateCoordinator(DataUpdateCoordinator[dict]):
         self._monitor.start()
 
     async def _async_update_data(self) -> dict:
+        """Wird stündlich ausgeführt (TR-064)."""
         try:
             if self.fetch_call_history:
                 await self.hass.async_add_executor_job(self._fetch_call_history)
@@ -53,6 +54,7 @@ class FritzboxCallUpdateCoordinator(DataUpdateCoordinator[dict]):
         except Exception as err:
             raise UpdateFailed(f"Fehler beim Abrufen: {err}") from err
 
+        # nur die letzten 60 Tage behalten
         cutoff = datetime.now() - timedelta(days=60)
         self._calls = [c for c in self._calls if c["datetime"] >= cutoff]
         return {"calls": list(self._calls), "voicemails": list(self._voicemails)}
@@ -129,4 +131,3 @@ def _parse_monitor_event(event: dict) -> dict | None:
         "date": dt.strftime("%Y-%m-%d"),
         "time": dt.strftime("%H:%M:%S"),
     }
-
