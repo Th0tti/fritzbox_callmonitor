@@ -1,4 +1,4 @@
-"""Sensor-Definitionen für Live-Core, History und Voicemails."""
+"""Sensor-Definitionen für Live-Core, History und Voicemails ohne Array-Attribute."""
 from __future__ import annotations
 
 from datetime import datetime
@@ -7,6 +7,7 @@ from homeassistant.helpers.entity import Entity
 
 from .base import FritzboxCallUpdateCoordinator
 from .const import DOMAIN
+
 
 async def async_setup_entry(hass, entry, async_add_entities):
     """Registriere Core- und History-Sensoren."""
@@ -22,6 +23,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
     async_add_entities(entities)
 
+
 class FritzboxHistorySensor(Entity):
     """Basis-Klasse ohne Polling, mit UpdateListener."""
 
@@ -32,7 +34,6 @@ class FritzboxHistorySensor(Entity):
 
     async def async_added_to_hass(self):
         self.coordinator.async_add_listener(self._handle_coordinator_update)
-        # sofort initial beschreiben
         self._handle_coordinator_update()
 
     @callback
@@ -43,6 +44,14 @@ class FritzboxHistorySensor(Entity):
     def _update_state(self):
         raise NotImplementedError
 
+    def _get_last_call(self, calls: list[dict]) -> dict | None:
+        if not calls:
+            return None
+        # aufsteigend sortieren, letzten nehmen
+        last = sorted(calls, key=lambda c: c["datetime"])[-1]
+        return last
+
+
 class SensorCallMonitor(FritzboxHistorySensor):
     """Core: Zeigt den letzten Anruf-Status und Attribute."""
     _attr_unique_id = f"{DOMAIN}_last_call"
@@ -51,24 +60,23 @@ class SensorCallMonitor(FritzboxHistorySensor):
 
     def _update_state(self):
         calls = self.coordinator.data.get("calls", [])
-        if not calls:
+        last = self._get_last_call(calls)
+        if not last:
             self._attr_state = "idle"
             self._attr_extra_state_attributes = {}
             return
-
-        # nach datetime absteigend sortieren
-        last = sorted(calls, key=lambda c: c["datetime"], reverse=True)[0]
         self._attr_state = last["type"]
         self._attr_extra_state_attributes = {
-            "number": last["number"],
-            "weekday": last["weekday"],
-            "date": last["date"],
-            "time": last["time"],
-            "duration_seconds": last["duration"],
+            "nummer": last["number"],
+            "wochentag": last["weekday"],
+            "datum": last["date"],
+            "uhrzeit": last["time"],
+            "dauer_s": last["duration"],
         }
 
+
 class SensorOutgoingCalls(FritzboxHistorySensor):
-    """Anzahl der abgehenden Anrufe + History als Attribute."""
+    """Anzahl der abgehenden Anrufe + Attribute des letzten Abgehenden."""
     _attr_unique_id = f"{DOMAIN}_outgoing_calls"
     _attr_name = "Abgehende Anrufe"
     _attr_icon = "mdi:phone-outgoing"
@@ -76,7 +84,18 @@ class SensorOutgoingCalls(FritzboxHistorySensor):
     def _update_state(self):
         calls = [c for c in self.coordinator.data.get("calls", []) if c["type"] == "outgoing"]
         self._attr_state = len(calls)
-        self._attr_extra_state_attributes = {"calls": calls}
+        last = self._get_last_call(calls)
+        if last:
+            self._attr_extra_state_attributes = {
+                "letzte_nummer": last["number"],
+                "letzter_wochentag": last["weekday"],
+                "letztes_datum": last["date"],
+                "letzte_uhrzeit": last["time"],
+                "letzte_dauer_s": last["duration"],
+            }
+        else:
+            self._attr_extra_state_attributes = {}
+
 
 class SensorIncomingCalls(FritzboxHistorySensor):
     _attr_unique_id = f"{DOMAIN}_incoming_calls"
@@ -86,7 +105,18 @@ class SensorIncomingCalls(FritzboxHistorySensor):
     def _update_state(self):
         calls = [c for c in self.coordinator.data.get("calls", []) if c["type"] == "incoming"]
         self._attr_state = len(calls)
-        self._attr_extra_state_attributes = {"calls": calls}
+        last = self._get_last_call(calls)
+        if last:
+            self._attr_extra_state_attributes = {
+                "letzte_nummer": last["number"],
+                "letzter_wochentag": last["weekday"],
+                "letztes_datum": last["date"],
+                "letzte_uhrzeit": last["time"],
+                "letzte_dauer_s": last["duration"],
+            }
+        else:
+            self._attr_extra_state_attributes = {}
+
 
 class SensorMissedCalls(FritzboxHistorySensor):
     _attr_unique_id = f"{DOMAIN}_missed_calls"
@@ -96,7 +126,18 @@ class SensorMissedCalls(FritzboxHistorySensor):
     def _update_state(self):
         calls = [c for c in self.coordinator.data.get("calls", []) if c["type"] == "missed"]
         self._attr_state = len(calls)
-        self._attr_extra_state_attributes = {"calls": calls}
+        last = self._get_last_call(calls)
+        if last:
+            self._attr_extra_state_attributes = {
+                "letzte_nummer": last["number"],
+                "letzter_wochentag": last["weekday"],
+                "letztes_datum": last["date"],
+                "letzte_uhrzeit": last["time"],
+                "letzte_dauer_s": last["duration"],
+            }
+        else:
+            self._attr_extra_state_attributes = {}
+
 
 class SensorVoicemails(FritzboxHistorySensor):
     _attr_unique_id = f"{DOMAIN}_voicemails"
@@ -106,4 +147,12 @@ class SensorVoicemails(FritzboxHistorySensor):
     def _update_state(self):
         msgs = self.coordinator.data.get("voicemails", [])
         self._attr_state = len(msgs)
-        self._attr_extra_state_attributes = {"messages": msgs}
+        last = self._get_last_call(msgs)
+        if last:
+            self._attr_extra_state_attributes = {
+                "letzte_datum": last["date"],
+                "letzte_uhrzeit": last["time"],
+                "url": last["url"],
+            }
+        else:
+            self._attr_extra_state_attributes = {}
