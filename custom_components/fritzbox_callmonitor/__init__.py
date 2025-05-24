@@ -9,15 +9,19 @@ from homeassistant.core import HomeAssistant
 from .base import FritzboxCallUpdateCoordinator
 from .const import (
     DOMAIN,
-    CONF_FETCH_CALL_HISTORY,
-    CONF_FETCH_VOICEMAILS,
     CONF_HOST,
     CONF_USERNAME,
     CONF_PASSWORD,
-    CONF_PORT,
+    CONF_TR064_PORT,
+    CONF_MONITOR_PORT,
+    CONF_FETCH_CALL_HISTORY,
+    CONF_FETCH_VOICEMAILS,
+    DEFAULT_TR064_PORT,
+    DEFAULT_MONITOR_PORT,
     DEFAULT_UPDATE_INTERVAL,
 )
 from .sensor import (
+    SensorCallMonitor,
     SensorOutgoingCalls,
     SensorIncomingCalls,
     SensorMissedCalls,
@@ -32,19 +36,22 @@ async def async_setup(hass: HomeAssistant, config: dict):
     return True
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
-    host = entry.data[CONF_HOST]
-    username = entry.data[CONF_USERNAME]
-    password = entry.data[CONF_PASSWORD]
-    port = entry.data.get(CONF_PORT)
-    fetch_call_history = entry.data.get(CONF_FETCH_CALL_HISTORY)
-    fetch_voicemails = entry.data.get(CONF_FETCH_VOICEMAILS)
+    data = entry.data
+    host = data[CONF_HOST]
+    username = data[CONF_USERNAME]
+    password = data[CONF_PASSWORD]
+    tr064_port = data.get(CONF_TR064_PORT, DEFAULT_TR064_PORT)
+    monitor_port = data.get(CONF_MONITOR_PORT, DEFAULT_MONITOR_PORT)
+    fetch_call_history = data.get(CONF_FETCH_CALL_HISTORY, True)
+    fetch_voicemails = data.get(CONF_FETCH_VOICEMAILS, False)
 
     coordinator = FritzboxCallUpdateCoordinator(
         hass,
         host=host,
         username=username,
         password=password,
-        port=port,
+        tr064_port=tr064_port,
+        monitor_port=monitor_port,
         fetch_call_history=fetch_call_history,
         fetch_voicemails=fetch_voicemails,
         update_interval=timedelta(seconds=DEFAULT_UPDATE_INTERVAL),
@@ -52,11 +59,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     await coordinator.async_config_entry_first_refresh()
     hass.data[DOMAIN][entry.entry_id] = coordinator
 
-    # Alte Zeile ersetzen:
-    # hass.config_entries.async_setup_platforms(entry, PLATFORMS)
-    # durch:
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-
     return True
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
