@@ -4,14 +4,16 @@ import logging
 import threading
 from datetime import datetime, timedelta
 from queue import Empty
-
 from fritzconnection import FritzConnection
 from fritzconnection.core.fritzmonitor import FritzMonitor
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
-
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
+
+# ¹ Wenn dein Fritz!OS ausschließlich OnTel v1 spricht, setze SERVICE = "X_AVM-DE_OnTel:1"
+# ² Manche neueren Boxen verwenden stattdessen OnTel v2 – dann SERVICE = "X_AVM-DE_OnTel:2"
+SERVICE = "X_AVM-DE_OnTel:1"  # ← PROBIERE ggf. "X_AVM-DE_OnTel:2" aus
 
 class FritzboxCallUpdateCoordinator(DataUpdateCoordinator[dict]):
     def __init__(
@@ -25,7 +27,6 @@ class FritzboxCallUpdateCoordinator(DataUpdateCoordinator[dict]):
         fetch_voicemails: bool,
         update_interval: timedelta,
     ) -> None:
-        """Init: setze Parameter, starte TR-064-Lader und CallMonitor-Thread."""
         super().__init__(hass, _LOGGER, name=DOMAIN, update_interval=update_interval)
         self.host = host
         self.username = username
@@ -33,8 +34,6 @@ class FritzboxCallUpdateCoordinator(DataUpdateCoordinator[dict]):
         self.port = port
         self.fetch_call_history = fetch_call_history
         self.fetch_voicemails = fetch_voicemails
-
-        # interner Speicher
         self._calls: list[dict] = []
         self._voicemails: list[dict] = []
 
@@ -46,12 +45,11 @@ class FritzboxCallUpdateCoordinator(DataUpdateCoordinator[dict]):
         threading.Thread(target=self._event_loop, daemon=True).start()
 
     def _event_loop(self) -> None:
-        """Endlosschleife im Thread, um CallMonitor-Events zu verarbeiten."""
+        """Endlosschleife, um live-Events aus der Queue zu verarbeiten."""
         while True:
             try:
                 raw = self._event_queue.get(timeout=10)
             except Empty:
-                # Healthcheck: Verbindung tot?
                 if not self._monitor.is_alive:
                     _LOGGER.error("FritzMonitor-Verbindung verloren, beende Thread")
                     break
@@ -63,7 +61,6 @@ class FritzboxCallUpdateCoordinator(DataUpdateCoordinator[dict]):
             call = _parse_monitor_event(raw)
             if call:
                 self._calls.append(call)
-                # trigger Update für alle Sensoren
                 self.async_set_updated_data({
                     "calls": list(self._calls),
                     "voicemails": list(self._voicemails),
@@ -79,7 +76,7 @@ class FritzboxCallUpdateCoordinator(DataUpdateCoordinator[dict]):
         except Exception as err:
             raise UpdateFailed(f"Fehler beim Abrufen via TR-064: {err}") from err
 
-        # nur Einträge der letzten 60 Tage behalten
+        # nur die letzten 60 Tage behalten
         cutoff = datetime.now() - timedelta(days=60)
         self._calls = [c for c in self._calls if c["datetime"] >= cutoff]
 
@@ -90,13 +87,18 @@ class FritzboxCallUpdateCoordinator(DataUpdateCoordinator[dict]):
 
     def _fetch_call_history(self) -> None:
         """Erstmaliger und stündlicher Abruf aller Anrufe via TR-064."""
-        fc = FritzConnection(
-            address=self.host,
-            port=self.port,
-            user=self.username,
-            password=self.password,
-        )
-        result = fc.call_action("X_AVM-DE_OnTel:1", "GetCallList")
+        try:
+            fc = FritzConnection(
+                address=self.host,
+                port=self.port,
+                user=self.username,
+                password=self.password,
+            )
+            result = fc.call_action(SERVICE, "GetCallList")
+        except Exception as err:
+            _LOGGER.warning("GetCallList fehlgeschlagen (%s): %s", SERVICE, err)
+            return
+
         for item in result.get("NewCallList", {}).get("Call", []):
             call = _parse_call(item)
             if call not in self._calls:
@@ -104,13 +106,18 @@ class FritzboxCallUpdateCoordinator(DataUpdateCoordinator[dict]):
 
     def _fetch_voicemails(self) -> None:
         """Erstmaliger und stündlicher Abruf aller Sprachnachrichten via TR-064."""
-        fc = FritzConnection(
-            address=self.host,
-            port=self.port,
-            user=self.username,
-            password=self.password,
-        )
-        result = fc.call_action("X_AVM-DE_OnTel:1", "GetMessageList")
+        try:
+            fc = FritzConnection(
+                address=self.host,
+                port=self.port,
+                user=self.username,
+                password=self.password,
+            )
+            result = fc.call_action(SERVICE, "GetMessageList")
+        except Exception as err:
+            _LOGGER.warning("GetMessageList fehlgeschlagen (%s): %s", SERVICE, err)
+            return
+
         for item in result.get("NewMessageList", {}).get("Message", []):
             vm = _parse_voicemail(item)
             if vm not in self._voicemails:
@@ -118,7 +125,7 @@ class FritzboxCallUpdateCoordinator(DataUpdateCoordinator[dict]):
 
 
 def _parse_call(item: dict) -> dict:
-    """Parse TR-064 CallList-Eintrag."""
+    from datetime import datetime
     time_str = item.get("Time", "")
     dt = datetime.strptime(time_str, "%Y-%m-%dT%H:%M:%S")
     type_map = {"1": "missed", "2": "incoming", "3": "outgoing"}
@@ -132,8 +139,9 @@ def _parse_call(item: dict) -> dict:
         "time": dt.strftime("%H:%M:%S"),
     }
 
+
 def _parse_voicemail(item: dict) -> dict:
-    """Parse TR-064 MessageList-Eintrag."""
+    from datetime import datetime
     ts = item.get("Timestamp", "")
     dt = datetime.strptime(ts, "%Y-%m-%dT%H:%M:%S")
     return {
@@ -143,11 +151,13 @@ def _parse_voicemail(item: dict) -> dict:
         "url": item.get("MessageURL", ""),
     }
 
+
 def _parse_monitor_event(raw: str) -> dict | None:
-    """Parse einen String aus CallMonitor-Queue in unser dict-Format."""
+    from datetime import datetime
     parts = raw.split(";")
     if len(parts) < 2:
         return None
+
     # Datum/Zeit im Format 'DD.MM.YY HH:MM:SS'
     try:
         dt = datetime.strptime(parts[0], "%d.%m.%y %H:%M:%S")
@@ -159,7 +169,6 @@ def _parse_monitor_event(raw: str) -> dict | None:
     if verb not in ("RING", "CALL", "DISCONNECT"):
         return None
 
-    # Nummer je nach Eventtyp
     if verb == "RING":
         number = parts[3] if len(parts) > 3 else ""
         call_type = "incoming"
@@ -167,7 +176,7 @@ def _parse_monitor_event(raw: str) -> dict | None:
         number = parts[4] if len(parts) > 4 else ""
         call_type = "outgoing"
     else:  # DISCONNECT
-        number = ""  # wir kennen die Nummer erst aus TR-064
+        number = ""
         call_type = "missed"
 
     return {
