@@ -13,7 +13,7 @@ from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
-# Versuche beide Service-Versionen, damit wir historische Anrufe bekommen
+# Für FRITZ!OS 8.x muss TR-064 OnTel v2 verwenden, wir probieren aber v2 und als Fallback v1
 SERVICES = ["X_AVM-DE_OnTel:2", "X_AVM-DE_OnTel:1"]
 
 class FritzboxCallUpdateCoordinator(DataUpdateCoordinator[dict]):
@@ -42,17 +42,17 @@ class FritzboxCallUpdateCoordinator(DataUpdateCoordinator[dict]):
         self._monitor = FritzMonitor(address=self.host, port=self.port)
         self._event_queue = self._monitor.start()
 
-        # Background-Thread zum Verarbeiten der Queue
+        # Thread zum Verarbeiten der Queue
         threading.Thread(target=self._event_loop, daemon=True).start()
 
     def _event_loop(self) -> None:
-        """Endlosschleife, um live-Events zu parsen."""
+        """Live-Events aus der Monitor-Queue lesen."""
         while True:
             try:
                 raw = self._event_queue.get(timeout=10)
             except Empty:
                 if not self._monitor.is_alive:
-                    _LOGGER.error("FritzMonitor-Verbindung verloren, Thread stoppt")
+                    _LOGGER.error("FritzMonitor-Verbindung verloren, Thread stopt")
                     break
                 continue
             except Exception as err:
@@ -68,7 +68,7 @@ class FritzboxCallUpdateCoordinator(DataUpdateCoordinator[dict]):
                 })
 
     async def _async_update_data(self) -> dict:
-        """Wird stündlich ausgeführt, um TR-064-Daten zu laden."""
+        """Stündlicher TR-064-Abruf – Historie & Voicemails."""
         try:
             if self.fetch_call_history:
                 await self.hass.async_add_executor_job(self._fetch_call_history)
@@ -112,7 +112,7 @@ class FritzboxCallUpdateCoordinator(DataUpdateCoordinator[dict]):
                 self._calls.append(call)
 
     def _fetch_voicemails(self) -> None:
-        """Erstmaliger und stündlicher Abruf aller Sprachnachrichten via TR-064."""
+        """Erstmaliger und stündlicher Abruf aller Voicemails via TR-064."""
         fc = FritzConnection(
             address=self.host,
             port=self.port,
@@ -138,7 +138,6 @@ class FritzboxCallUpdateCoordinator(DataUpdateCoordinator[dict]):
 
 
 def _parse_call(item: dict) -> dict:
-    """Parse TR-064 CallList-Eintrag."""
     from datetime import datetime
     time_str = item.get("Time", "")
     dt = datetime.strptime(time_str, "%Y-%m-%dT%H:%M:%S")
@@ -155,7 +154,6 @@ def _parse_call(item: dict) -> dict:
 
 
 def _parse_voicemail(item: dict) -> dict:
-    """Parse TR-064 MessageList-Eintrag."""
     from datetime import datetime
     ts = item.get("Timestamp", "")
     dt = datetime.strptime(ts, "%Y-%m-%dT%H:%M:%S")
@@ -168,17 +166,15 @@ def _parse_voicemail(item: dict) -> dict:
 
 
 def _parse_monitor_event(raw: str) -> dict | None:
-    """Parse einen String aus CallMonitor-Queue in unser dict-Format."""
     from datetime import datetime
     parts = raw.split(";")
     if len(parts) < 2:
         return None
 
-    # Datum/Zeit im Format 'DD.MM.YY HH:MM:SS'
     try:
         dt = datetime.strptime(parts[0], "%d.%m.%y %H:%M:%S")
     except ValueError:
-        _LOGGER.warning("Unparsebares CallMonitor-Zeitstempel: %s", parts[0])
+        _LOGGER.warning("Unparsebares CallMonitor-Timestamp: %s", parts[0])
         return None
 
     verb = parts[1]
