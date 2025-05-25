@@ -1,18 +1,32 @@
-"""Konstanten für die Fritz!Box Anrufe Integration."""
+"""Constants for the fritzbox_anrufe integration."""
+
 DOMAIN = "fritzbox_anrufe"
 
-CONF_HOST = "host"
-CONF_USERNAME = "username"
-CONF_PASSWORD = "password"
-CONF_TR064_PORT = "tr064_port"
-CONF_MONITOR_PORT = "monitor_port"
-CONF_FETCH_CALL_HISTORY = "fetch_call_history"
-CONF_FETCH_VOICEMAILS = "fetch_voicemails"
+CONF_PHONEBOOK = "phonebook"
+CONF_PREFIXES = "prefixes"
 
-DEFAULT_TR064_PORT = 49000
-DEFAULT_MONITOR_PORT = 1012
-DEFAULT_UPDATE_INTERVAL = 3600  # Sekunden
+DEFAULT_PREFIXES = []
 
-# Für Phonebook
-UNKNOWN_NAME = "unknown"
-REGEX_NUMBER = r"[^\d\+]"
+SENSOR_TYPE_CALL_MONITOR = "call_monitor"
+SENSOR_DEVICE_CLASS = "enum"
+SENSOR_NAME_FORMAT = "Fritz!Box Anrufe {phonebook_id}"
+
+STATE_RINGING = "ringing"
+STATE_DIALING = "dialing"
+STATE_TALKING = "talking"
+STATE_IDLE = "idle"
+
+ATTR_TYPE = "type"
+ATTR_FROM = "from"
+ATTR_TO = "to"
+ATTR_WITH = "with"
+ATTR_DEVICE = "device"
+ATTR_INITIATED = "initiated"
+ATTR_ACCEPTED = "accepted"
+ATTR_CLOSED = "closed"
+ATTR_DURATION = "duration"
+ATTR_FROM_NAME = "from_name"
+ATTR_WITH_NAME = "with_name"
+ATTR_TO_NAME = "to_name"
+ATTR_VIP = "vip"
+ATTR_PREFIXES = "prefixes"
