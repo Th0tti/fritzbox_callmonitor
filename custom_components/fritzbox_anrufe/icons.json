@@ -1,8 +1,17 @@
+// custom_components/fritzbox_anrufe/icons.json
+
 {
-  "call_monitor": {
-    "ringing": "mdi:phone-ring",
-    "dialing": "mdi:phone-outgoing",
-    "talking": "mdi:phone",
-    "idle": "mdi:phone-hangup"
+  "entity": {
+    "sensor": {
+      "fritzbox_callmonitor": {
+        "default": "mdi:phone",
+        "state": {
+          "ringing": "mdi:phone-incoming",
+          "dialing": "mdi:phone-outgoing",
+          "talking": "mdi:phone-in-talk"
+        }
+      }
+    }
   }
 }
+
