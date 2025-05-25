@@ -1,9 +1,8 @@
 {
-  "sensor": {
-    "fritzbox_anrufe_last_call": "mdi:phone",
-    "fritzbox_anrufe_outgoing":   "mdi:phone-outgoing",
-    "fritzbox_anrufe_incoming":   "mdi:phone-incoming",
-    "fritzbox_anrufe_missed":     "mdi:phone-missed",
-    "fritzbox_anrufe_voicemails": "mdi:voicemail"
+  "call_monitor": {
+    "ringing": "mdi:phone-ring",
+    "dialing": "mdi:phone-outgoing",
+    "talking": "mdi:phone",
+    "idle": "mdi:phone-hangup"
   }
 }
