@@ -1,8 +1,0 @@
-{
-  "sensor": {
-    "outgoing_calls": "mdi:phone-outgoing",
-    "incoming_calls": "mdi:phone-incoming",
-    "missed_calls":   "mdi:phone-missed",
-    "voicemails":     "mdi:voicemail"
-  }
-}
