@@ -1,11 +1,13 @@
+// custom_components/fritzbox_anrufe/manifest.json
+
 {
   "domain": "fritzbox_anrufe",
-  "name": "FritzBox Anrufe",
-  "version": "1.1.0",
-  "documentation": "https://github.com/Th0tti/fritzbox_anrufe",
-  "requirements": ["fritzconnection==1.4.2"],
-  "dependencies": [],
-  "codeowners": ["@Th0tti"],
-  "iot_class": "local_polling"
+  "name": "Fritz!Box Anrufe",
+  "codeowners": ["@cdce8p"],
+  "config_flow": true,
+  "documentation": "https://www.home-assistant.io/integrations/fritzbox_callmonitor",
+  "integration_type": "device",
+  "iot_class": "local_polling",
+  "loggers": ["fritzconnection"],
+  "requirements": ["fritzconnection[qr]==1.14.0"]
 }
-
