@@ -1,42 +1,70 @@
+# custom_components/fritzbox_anrufe/__init__.py
+
 """The fritzbox_anrufe integration."""
+
 import logging
 
-from homeassistant.core import HomeAssistant
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_HOST, CONF_PORT
+from fritzconnection.core.exceptions import FritzConnectionException, FritzSecurityError
+from requests.exceptions import ConnectionError as RequestsConnectionError
 
-from .const import DOMAIN
-from .base import FritzBoxBase
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_USERNAME
+from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
+
+from .base import FritzBoxPhonebook
+from .const import CONF_PHONEBOOK, CONF_PREFIXES, PLATFORMS
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS = ["sensor"]
+type FritzBoxCallMonitorConfigEntry = ConfigEntry[FritzBoxPhonebook]
 
-async def async_setup(hass: HomeAssistant, config: dict):
-    """Set up the fritzbox_anrufe component (legacy)."""
-    _LOGGER.debug("Setting up fritzbox_anrufe")
-    hass.data.setdefault(DOMAIN, {})
-    return True
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
-    """Set up fritzbox_anrufe from a config entry."""
-    _LOGGER.debug("Loading config entry %s", entry.entry_id)
-    fritz = FritzBoxBase(hass, entry.data)
-    hass.data[DOMAIN][entry.entry_id] = fritz
-
-    for platform in PLATFORMS:
-        hass.async_create_task(
-            hass.config_entries.async_forward_entry_setup(entry, platform)
-        )
-    return True
-
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
-    """Unload a config entry."""
-    _LOGGER.debug("Unloading config entry %s", entry.entry_id)
-    unload_ok = all(
-        await hass.config_entries.async_forward_entry_unload(entry, platform)
-        for platform in PLATFORMS
+async def async_setup_entry(
+    hass: HomeAssistant, config_entry: FritzBoxCallMonitorConfigEntry
+) -> bool:
+    """Set up the fritzbox_anrufe platforms."""
+    fritzbox_phonebook = FritzBoxPhonebook(
+        host=config_entry.data[CONF_HOST],
+        username=config_entry.data[CONF_USERNAME],
+        password=config_entry.data[CONF_PASSWORD],
+        phonebook_id=config_entry.data[CONF_PHONEBOOK],
+        prefixes=config_entry.options.get(CONF_PREFIXES),
     )
-    if unload_ok:
-        hass.data[DOMAIN].pop(entry.entry_id)
-    return unload_ok
+
+    try:
+        await hass.async_add_executor_job(fritzbox_phonebook.init_phonebook)
+    except FritzSecurityError as ex:
+        _LOGGER.error(
+            (
+                "User has insufficient permissions to access AVM FRITZ!Box settings and"
+                " its phonebooks: %s"
+            ),
+            ex,
+        )
+        return False
+    except FritzConnectionException as ex:
+        raise ConfigEntryAuthFailed from ex
+    except RequestsConnectionError as ex:
+        _LOGGER.error("Unable to connect to AVM FRITZ!Box call monitor: %s", ex)
+        raise ConfigEntryNotReady from ex
+
+    config_entry.runtime_data = fritzbox_phonebook
+    config_entry.async_on_unload(config_entry.add_update_listener(update_listener))
+    await hass.config_entries.async_forward_entry_setups(config_entry, PLATFORMS)
+
+    return True
+
+
+async def async_unload_entry(
+    hass: HomeAssistant, config_entry: FritzBoxCallMonitorConfigEntry
+) -> bool:
+    """Unloading the fritzbox_anrufe platforms."""
+    return await hass.config_entries.async_unload_platforms(config_entry, PLATFORMS)
+
+
+async def update_listener(
+    hass: HomeAssistant, config_entry: FritzBoxCallMonitorConfigEntry
+) -> None:
+    """Update listener to reload after option has changed."""
+    await hass.config_entries.async_reload(config_entry.entry_id)
