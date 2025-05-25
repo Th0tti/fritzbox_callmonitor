@@ -1,38 +1,37 @@
-"""Config Flow für Fritz!Box Anrufe."""
-from __future__ import annotations
+"""Config flow for fritzbox_anrufe integration."""
+import logging
+
+from homeassistant import config_entries
+from homeassistant.const import CONF_HOST, CONF_PORT, CONF_USERNAME, CONF_PASSWORD
 import voluptuous as vol
 
-from homeassistant.config_entries import ConfigFlow
-from homeassistant.const import CONF_HOST, CONF_USERNAME, CONF_PASSWORD
+from .const import DOMAIN, CONF_PHONEBOOK, CONF_PREFIXES, DEFAULT_PREFIXES
 
-from .const import (
-    DOMAIN,
-    DEFAULT_TR064_PORT,
-    DEFAULT_MONITOR_PORT,
-    CONF_TR064_PORT,
-    CONF_MONITOR_PORT,
-    CONF_FETCH_CALL_HISTORY,
-    CONF_FETCH_VOICEMAILS,
-)
+_LOGGER = logging.getLogger(__name__)
 
-DATA_SCHEMA = vol.Schema(
+STEP_USER_DATA_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_HOST): str,
+        vol.Required(CONF_PORT, default=49000): int,
         vol.Required(CONF_USERNAME): str,
         vol.Required(CONF_PASSWORD): str,
-        vol.Optional(CONF_TR064_PORT, default=DEFAULT_TR064_PORT): int,
-        vol.Optional(CONF_MONITOR_PORT, default=DEFAULT_MONITOR_PORT): int,
-        vol.Optional(CONF_FETCH_CALL_HISTORY, default=True): bool,
-        vol.Optional(CONF_FETCH_VOICEMAILS, default=False): bool,
+        vol.Optional(CONF_PHONEBOOK, default=0): int,
+        vol.Optional(CONF_PREFIXES, default=DEFAULT_PREFIXES): list,
     }
 )
 
-class FritzboxAnrufeFlowHandler(ConfigFlow, domain=DOMAIN):
-    """Handle config flow of fritzbox_anrufe."""
+class FritzBoxAnrufeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+    """Handle a config flow for fritzbox_anrufe."""
+
     VERSION = 1
 
     async def async_step_user(self, user_input=None):
-        errors: dict[str, str] = {}
+        """Handle the initial step."""
+        errors = {}
         if user_input is not None:
-            return self.async_create_entry(title="Fritz!Box Anrufe", data=user_input)
-        return self.async_show_form(step_id="user", data_schema=DATA_SCHEMA, errors=errors)
+            # Hier könnte man Connectivity prüfen
+            return self.async_create_entry(title=f"{user_input[CONF_HOST]}", data=user_input)
+
+        return self.async_show_form(
+            step_id="user", data_schema=STEP_USER_DATA_SCHEMA, errors=errors
+        )
