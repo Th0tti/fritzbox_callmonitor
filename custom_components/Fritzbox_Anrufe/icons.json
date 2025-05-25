@@ -1,9 +1,0 @@
-{
-  "sensor": {
-    "fritzbox_anrufe_last_call": "mdi:phone",
-    "fritzbox_anrufe_outgoing_calls": "mdi:phone-outgoing",
-    "fritzbox_anrufe_incoming_calls": "mdi:phone-incoming",
-    "fritzbox_anrufe_missed_calls":   "mdi:phone-missed",
-    "fritzbox_anrufe_voicemails":     "mdi:voicemail"
-  }
-}
