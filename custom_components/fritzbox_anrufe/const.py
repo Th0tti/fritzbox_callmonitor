@@ -1,32 +1,42 @@
+# custom_components/fritzbox_anrufe/const.py
+
 """Constants for the fritzbox_anrufe integration."""
 
-DOMAIN = "fritzbox_anrufe"
+from enum import StrEnum
+from typing import Final
+
+from homeassistant.const import Platform
+
+
+class FritzState(StrEnum):
+    """Fritz!Box call states."""
+
+    RING = "RING"
+    CALL = "CALL"
+    CONNECT = "CONNECT"
+    DISCONNECT = "DISCONNECT"
+
+
+ATTR_PREFIXES = "prefixes"
+
+FRITZ_ATTR_NAME = "name"
+FRITZ_ATTR_SERIAL_NUMBER = "Serial"
+
+UNKNOWN_NAME = "unknown"
+SERIAL_NUMBER = "serial_number"
+REGEX_NUMBER = r"[^\d\+]"
 
 CONF_PHONEBOOK = "phonebook"
+CONF_PHONEBOOK_NAME = "phonebook_name"
 CONF_PREFIXES = "prefixes"
 
-DEFAULT_PREFIXES = []
+DEFAULT_HOST = "169.254.1.1" 
+DEFAULT_PORT = 1012
+DEFAULT_USERNAME = "admin"
+DEFAULT_PHONEBOOK = 0
+DEFAULT_NAME = "Phone"
 
-SENSOR_TYPE_CALL_MONITOR = "call_monitor"
-SENSOR_DEVICE_CLASS = "enum"
-SENSOR_NAME_FORMAT = "Fritz!Box Anrufe {phonebook_id}"
+DOMAIN: Final = "fritzbox_anrufe"
+MANUFACTURER: Final = "AVM"
 
-STATE_RINGING = "ringing"
-STATE_DIALING = "dialing"
-STATE_TALKING = "talking"
-STATE_IDLE = "idle"
-
-ATTR_TYPE = "type"
-ATTR_FROM = "from"
-ATTR_TO = "to"
-ATTR_WITH = "with"
-ATTR_DEVICE = "device"
-ATTR_INITIATED = "initiated"
-ATTR_ACCEPTED = "accepted"
-ATTR_CLOSED = "closed"
-ATTR_DURATION = "duration"
-ATTR_FROM_NAME = "from_name"
-ATTR_WITH_NAME = "with_name"
-ATTR_TO_NAME = "to_name"
-ATTR_VIP = "vip"
-ATTR_PREFIXES = "prefixes"
+PLATFORMS = [Platform.SENSOR]
