@@ -1,5 +1,5 @@
 {
-  "name": "Fritz!Box Call Monitor",
+  "name": "Fritz!Box Anrufe",
   "content_in_root": false,
-  "domains": ["fritzbox_callmonitor"]
+  "domains": ["fritzbox_anrufe"]
 }
