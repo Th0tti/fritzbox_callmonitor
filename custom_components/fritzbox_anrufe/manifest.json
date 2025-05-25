@@ -1,7 +1,7 @@
 {
   "domain": "fritzbox_anrufe",
   "name": "FritzBox Anrufe",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "documentation": "https://github.com/Th0tti/fritzbox_anrufe",
   "requirements": ["fritzconnection==1.4.2"],
   "dependencies": [],
