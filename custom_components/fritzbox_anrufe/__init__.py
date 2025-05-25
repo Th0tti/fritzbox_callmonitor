@@ -1,63 +1,42 @@
-"""Fritz!Box Anrufe Integration."""
-from __future__ import annotations
-from datetime import timedelta
+"""The fritzbox_anrufe integration."""
 import logging
 
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import CONF_HOST, CONF_PORT
 
-from .base import FritzboxCallUpdateCoordinator
-from .const import (
-    DOMAIN,
-    CONF_HOST,
-    CONF_USERNAME,
-    CONF_PASSWORD,
-    CONF_TR064_PORT,
-    CONF_MONITOR_PORT,
-    CONF_FETCH_CALL_HISTORY,
-    CONF_FETCH_VOICEMAILS,
-    DEFAULT_TR064_PORT,
-    DEFAULT_MONITOR_PORT,
-    DEFAULT_UPDATE_INTERVAL,
-)
-from .sensor import FritzBoxCallSensor
+from .const import DOMAIN
+from .base import FritzBoxBase
 
 _LOGGER = logging.getLogger(__name__)
+
 PLATFORMS = ["sensor"]
 
 async def async_setup(hass: HomeAssistant, config: dict):
+    """Set up the fritzbox_anrufe component (legacy)."""
+    _LOGGER.debug("Setting up fritzbox_anrufe")
     hass.data.setdefault(DOMAIN, {})
     return True
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
-    data = entry.data
-    host = data[CONF_HOST]
-    username = data[CONF_USERNAME]
-    password = data[CONF_PASSWORD]
-    tr064_port = data.get(CONF_TR064_PORT, DEFAULT_TR064_PORT)
-    monitor_port = data.get(CONF_MONITOR_PORT, DEFAULT_MONITOR_PORT)
-    fetch_call_history = data.get(CONF_FETCH_CALL_HISTORY, True)
-    fetch_voicemails = data.get(CONF_FETCH_VOICEMAILS, False)
+    """Set up fritzbox_anrufe from a config entry."""
+    _LOGGER.debug("Loading config entry %s", entry.entry_id)
+    fritz = FritzBoxBase(hass, entry.data)
+    hass.data[DOMAIN][entry.entry_id] = fritz
 
-    coordinator = FritzboxCallUpdateCoordinator(
-        hass,
-        host=host,
-        username=username,
-        password=password,
-        tr064_port=tr064_port,
-        monitor_port=monitor_port,
-        fetch_call_history=fetch_call_history,
-        fetch_voicemails=fetch_voicemails,
-        update_interval=timedelta(seconds=DEFAULT_UPDATE_INTERVAL),
-    )
-    await coordinator.async_config_entry_first_refresh()
-    hass.data[DOMAIN][entry.entry_id] = coordinator
-
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    for platform in PLATFORMS:
+        hass.async_create_task(
+            hass.config_entries.async_forward_entry_setup(entry, platform)
+        )
     return True
 
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
+    """Unload a config entry."""
+    _LOGGER.debug("Unloading config entry %s", entry.entry_id)
+    unload_ok = all(
+        await hass.config_entries.async_forward_entry_unload(entry, platform)
+        for platform in PLATFORMS
+    )
     if unload_ok:
         hass.data[DOMAIN].pop(entry.entry_id)
     return unload_ok
